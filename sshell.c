@@ -6,12 +6,20 @@
 
 #define CMDLINE_MAX 512
 
+/* every input can be organized into  its 
+ * command 
+ * arguments 
+ */
 struct command {
   char input[CMDLINE_MAX];
-  char *cmd;
+  char *cmd; 
+/* maximum of 16 arguments with an extra space for the NULL argument*/
   char *args[17];
 };
 
+
+/* splits the input using the space character to mark the end of each argument 
+ */
 void parse_arg(struct command *obj, char *str) {
   char delim[] = " ";
   int count = 1;
@@ -26,10 +34,14 @@ void parse_arg(struct command *obj, char *str) {
       count = count + 1;
       obj->args[count] = ptr;
     }
-  }
+  }  
   obj->args[count + 1] = NULL;
 }
 
+/*Extract the command from entered input and stores it  
+ * calls on the next function to seperate each argument of the command 
+ * splits the input using the space character to mark the end of each argument
+ */
 void parse_cmd(struct command *obj, char *str) {
   char delim[] = " ";
   obj->cmd = strtok(str, delim);
@@ -71,12 +83,17 @@ int main(void) {
     parse_cmd(&x1, x1.input);
 
 
-    /* Builtin command */
+    /* Builtin exit command */
     if (!strcmp(x1.input, "exit")) {
-      fprintf(stderr, "Bye...\n");
+      fprintf(stderr, "Bye...\n"); 
+      fprintf(stdout, "Return status value for '%s': %d\n",
+            line, 0);
       break;
     }
-
+     /* non built in commands will be carried out by the exec function 
+      * the child process executes the command 
+      * the parent waits for the child to execute the process and displays its return status*/  
+    if(strcmp(x1.input, "pwd") && strcmp(x1.input, "cd") ){
     pid = fork();
     if (pid == 0) {
       /*child*/
@@ -89,12 +106,26 @@ int main(void) {
       waitpid(pid, &status, 0);
       retval = WEXITSTATUS(status);
     }
+  
+      /* Regular command */
+      fprintf(stdout, "Return status value for '%s': %d\n",
+      line, retval);
+ 
+    
+  }
 
+	/* Builtin command current Directory */
+	if (!strcmp(x1.input, "pwd")) {
+             fprintf(stdout, "%s\n", getcwd(x1.input,sizeof(x1.input)));
+	}
 
-
-    /* Regular command */
-    fprintf(stdout, "Return status value for '%s': %d\n",
-            line, retval);
+        /* Builtin command change Directory */
+        if (!strcmp(x1.input, "cd")) {
+             if(x1.args[1] =="")
+                  chdir("..");
+             else
+                  chdir(x1.args[1]); 
+	}
   }
 
   return EXIT_SUCCESS;
