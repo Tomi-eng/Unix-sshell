@@ -13,7 +13,7 @@
 	char *cmd; 
 	char *args[17];  
         char x[32]; 
-	char *file;	
+	char file[32];	
 };
 
 struct std_in
@@ -28,14 +28,17 @@ struct std_in
 /* splits the input using the space character to mark the end of each argument 
  * stores output file in file array if > is encountered
  */
-void parse_arg(struct command *obj,char *str){  
+void parse_arg(struct command *obj,char str[]){  
 	char ch = '>';  
-	if( strchr(str, ch) != NULL){
-   	char *file = strchr(str, ch); 
-	file  = file +1; 
-	strcpy(obj->file, file);
-   	memset(file, '\0', sizeof(file)); 
-	}
+  	if( strchr(str, ch) != NULL){
+   	char *xtr = strchr(str, ch); 
+   	xtr  = xtr +1; 
+ 	strcpy(obj->file, xtr);
+   	while( *xtr != '\0'){
+    		*xtr = '\0';  
+     		xtr++;  
+   		}	 
+  	}
 	char delim[] = " "; 
 	int count = 0;  
 	char *ptr= strtok(str, delim); 
