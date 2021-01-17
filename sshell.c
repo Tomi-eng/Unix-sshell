@@ -31,8 +31,10 @@ struct std_in
 void parse_arg(struct command *obj,char *str){  
 	char ch = '>';  
 	if( strchr(str, ch) != NULL){
-   	obj->file = strchr(str, ch);
-   	obj->file = obj->file +1; 
+   	char *file = strchr(str, ch); 
+	file  = file +1; 
+	strcpy(obj->file, file);
+   	memset(file, '\0', sizeof(file)); 
 	}
 	char delim[] = " "; 
 	int count = 0;  
