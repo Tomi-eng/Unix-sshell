@@ -2,25 +2,119 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h> 
-#include <sys/wait.h>
+#include <sys/wait.h> 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #define CMDLINE_MAX 512  
 
-
-
  struct command
-{ 
-	char *cmd; 
-	char *args[17];  
-        char x[32]; 
-	char file[32];	
+{
+        char *cmd;
+        char *args[17];
+        char x[32];
+        char file[32];
 };
 
 struct std_in
-{   
-	char input[CMDLINE_MAX];
-	struct command split[4];  
-};  
+{
+        char input[CMDLINE_MAX];
+        struct command split[4];
+};
+
+
+void pipeline (struct command p[], int num_com){ 
+       	num_com++;	
+	int fd[6]; 
+        int status;	
+	pipe(fd); 
+	if (num_com == 3)
+  		pipe(fd + 2);  
+	if (num_com == 4)
+		pipe(fd + 4);  
+	
+	if (fork() == 0)
+    {
+      		// replace cat's stdout with write part of 1st pipe
+
+      		dup2(fd[1], 1);
+
+      		// close all pipes
+      		for(int i =0;i < ((num_com - 1) * 2) ;i++) 
+		       close(fd[i]);	
+		execvp(p[0].args[0],p[0].args);
+    } 
+	else
+    {
+      
+	if (num_com == 3 || num_com == 4){
+      		if (fork() == 0)
+		{
+		
+			
+	  
+	  		dup2(fd[0], 0);
+
+	  	
+
+	  		dup2(fd[3], 1);
+
+	  		
+			for(int i =0;i < ((num_com - 1) * 2) ;i++)
+                       		close(fd[i]);
+	  	
+
+
+	  		execvp(p[1].args[0],p[1].args);
+		}
+     
+      			
+       		if ( num_com == 4){
+               		if (fork() == 0)
+                	{
+                       		
+				
+                        	dup2(fd[2], 0);
+                        	
+                        	dup2(fd[5], 1);
+                        	
+				for(int i =0;i < ((num_com - 1) * 2) ;i++)
+                       			close(fd[i]);
+                        	execvp(p[2].args[0],p[2].args);
+                	}
+
+           	}
+
+   	} 
+
+	if (fork() == 0)
+                {
+                    	
+			if(num_com == 2) 
+				dup2(fd[0], 0); 
+			else if(num_com == 3) 
+				dup2(fd[2], 0); 
+			else 
+				dup2(fd[4], 0);
+
+	     		
+			for(int i =0;i < ((num_com - 1) * 2) ;i++)
+                       		close(fd[i]);	
+
+                        execvp(p[num_com-1].args[0],p[num_com-1].args);
+                }
+
+	} 
+
+  
+	for(int i =0;i < ((num_com - 1) * 2) ;i++)
+        	close(fd[i]);
+
+  	for (int i = 0; i < num_com ; i++)
+    		wait(&status);		
+
+}  
 
 
 
@@ -33,7 +127,8 @@ void parse_arg(struct command *obj,char str[]){
   	if( strchr(str, ch) != NULL){
    	char *xtr = strchr(str, ch); 
    	xtr  = xtr +1; 
- 	strcpy(obj->file, xtr);
+ 	strcpy(obj->file, xtr); 
+	xtr--;
    	while( *xtr != '\0'){
     		*xtr = '\0';  
      		xtr++;  
@@ -46,7 +141,7 @@ void parse_arg(struct command *obj,char str[]){
 	obj->cmd = obj->args[count]; 
   	ptr = strtok(NULL, delim); 
       	count++;	
-  	obj->args[count]= "";
+  	obj->args[count]= NULL;
   
  	if(ptr != NULL){ 
 		obj->args[count] = ptr ;
@@ -94,11 +189,15 @@ int main(void)
         /*char cmd[CMDLINE_MAX]; 
 	char *args[] = {"", NULL};*/ 
 
-	struct std_in x1; 
+	
         char line[CMDLINE_MAX]; 
-	int num_com = 0;	
+		
 
-        while (1) {
+        while (1) {  
+		int num_com = 0; 
+		struct std_in x1;	 
+		struct command x2; 
+		int redi =0;
                 char *nl;
                 int retval; 
 		pid_t pid;
@@ -129,10 +228,15 @@ int main(void)
                         break;
                 }	
 		
-              if(strchr(x1.input, '|') !=  NULL) 
-		     num_com = parse_cmd(&x1,x1.input); 
-	      else 
-		     parse_arg(&x1.split[0],x1.input); 
+              if(strchr(x1.input, '|') !=  NULL){  
+			num_com = parse_cmd(&x1,x1.input); 
+			pipeline(x1.split,num_com);
+	      } 
+	      else{ 
+		      if(strchr(x1.input,'>') != NULL) 
+			      redi = 1;
+		     parse_arg(&x2,x1.input); 
+	      	} 
 	
 
 
@@ -144,8 +248,18 @@ int main(void)
              if(strcmp(x1.input, "pwd") && strcmp(x1.input, "cd") && num_com == 0 ){
 		pid = fork();
                 if(pid ==0){
-                 /*child*/
-                execvp(x1.split[0].cmd,x1.split[0].args);
+                 /*child*/ 
+		if(redi == 1){
+			int fd;
+        		if ((fd = open(x2.file, O_WRONLY | O_CREAT | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1) {            
+        			perror (x2.file);
+        			exit (EXIT_FAILURE);
+    			}
+        	
+        		dup2(fd, 1); 
+			close(fd);
+		}
+                execvp(x2.cmd,x2.args);
                 perror("execvp");
                 exit(1);
                 } else if (pid >0){ 
