@@ -24,8 +24,9 @@ struct std_in
 };
 
 
-void pipeline (struct command p[], int num_com){ 
-       	num_com++;	
+void pipeline (struct command p[], int num_com,char *line){ 
+       	num_com++; 
+	pid_t pid;	
 	int fd[6]; 
         int status;	
 	pipe(fd); 
@@ -33,8 +34,9 @@ void pipeline (struct command p[], int num_com){
   		pipe(fd + 2);  
 	if (num_com == 4)
 		pipe(fd + 4);  
-	
-	if (fork() == 0)
+
+	pid = fork();	
+	if (pid == 0)
     {
       		// replace cat's stdout with write part of 1st pipe
 
@@ -43,7 +45,8 @@ void pipeline (struct command p[], int num_com){
       		// close all pipes
       		for(int i =0;i < ((num_com - 1) * 2) ;i++) 
 		       close(fd[i]);	
-		execvp(p[0].args[0],p[0].args);
+		execvp(p[0].args[0],p[0].args); 
+		exit(1);
     } 
 	else
     {
@@ -66,7 +69,8 @@ void pipeline (struct command p[], int num_com){
 	  	
 
 
-	  		execvp(p[1].args[0],p[1].args);
+	  		execvp(p[1].args[0],p[1].args); 
+			exit(2);
 		}
      
       			
@@ -81,7 +85,8 @@ void pipeline (struct command p[], int num_com){
                         	
 				for(int i =0;i < ((num_com - 1) * 2) ;i++)
                        			close(fd[i]);
-                        	execvp(p[2].args[0],p[2].args);
+                        	execvp(p[2].args[0],p[2].args); 
+				exit(3);
                 	}
 
            	}
@@ -102,19 +107,36 @@ void pipeline (struct command p[], int num_com){
 			for(int i =0;i < ((num_com - 1) * 2) ;i++)
                        		close(fd[i]);	
 
-                        execvp(p[num_com-1].args[0],p[num_com-1].args);
+                        execvp(p[num_com-1].args[0],p[num_com-1].args); 
+			exit(4);
                 }
 
-	} 
-
-  
+	} 	
+	
+	int retval[num_com];
+	
+  	
 	for(int i =0;i < ((num_com - 1) * 2) ;i++)
-        	close(fd[i]);
+        	close(fd[i]); 
+	for (int i = 0; i < num_com ; i++){
+                wait(&status); 
+		retval[i] = WEXITSTATUS(status);
+        }
+       
 
-  	for (int i = 0; i < num_com ; i++)
-    		wait(&status);		
-
+      		
+	fprintf(stdout, "+ completed  '%s' [%d]",line,retval[0]);
+      	for (int i = 1; i < num_com ; i++)
+        	fprintf(stdout, "[%d]",retval[i]); 
+	fprintf(stdout,"\n");
 }  
+
+void set_file(struct command *obj,char file[]){
+	char *ptr = file;
+ 	while( *ptr == ' ')
+  	ptr++;
+  	strcpy(obj->file, ptr);
+}
 
 
 
@@ -122,12 +144,14 @@ void pipeline (struct command p[], int num_com){
 /* splits the input using the space character to mark the end of each argument 
  * stores output file in file array if > is encountered
  */
-void parse_arg(struct command *obj,char str[]){  
-	char ch = '>';  
+int parse_arg(struct command *obj,char str[]){  
+	char ch = '>'; 
+      	char file[32];	
   	if( strchr(str, ch) != NULL){
    	char *xtr = strchr(str, ch); 
    	xtr  = xtr +1; 
- 	strcpy(obj->file, xtr); 
+ 	strcpy(file, xtr); 
+       	set_file(obj,file);	
 	xtr--;
    	while( *xtr != '\0'){
     		*xtr = '\0';  
@@ -150,7 +174,12 @@ void parse_arg(struct command *obj,char str[]){
 			count = count + 1;
 			obj->args[count] = ptr ;
  		} 
-   	}	    
+   	}	  
+    	if(count == 16){ 
+       		return 1; 
+	}	 
+	
+	return 0;	
 }
 
 
@@ -190,17 +219,19 @@ int main(void)
 	char *args[] = {"", NULL};*/ 
 
 	
-        char line[CMDLINE_MAX]; 
+        char line[CMDLINE_MAX];	
 		
 
         while (1) {  
 		int num_com = 0; 
 		struct std_in x1;	 
 		struct command x2; 
-		int redi =0;
+		int redirect=0;
                 char *nl;
-                int retval; 
-		pid_t pid;
+                int retval =0; 
+		pid_t pid; 
+		int err = 0; 
+		
 
                 /* Print prompt */
                 printf("sshell$ ");
@@ -224,18 +255,29 @@ int main(void)
 		strcpy(line, x1.input); 
 		/* Builtin command */
                 if (!strcmp(x1.input, "exit")) {
-                        fprintf(stderr, "Bye...\n");
+                        fprintf(stderr, "+ completed  '%s' [%d]\n",line, retval);
                         break;
                 }	
 		
-              if(strchr(x1.input, '|') !=  NULL){  
+
+		char *ptr = strchr(x1.input, '|'); 
+		char *rdptr =strchr(x1.input, '>'); 	
+              if(ptr !=  NULL){   
+		      	if((ptr && rdptr != NULL) && ptr > rdptr){ 
+				fprintf(stderr,"Error: mislocated output redirection\n");
+                                continue;
+			}				
 			num_com = parse_cmd(&x1,x1.input); 
-			pipeline(x1.split,num_com);
+		        if(num_com < 1){ 
+			fprintf(stderr,"Error: missing command\n");
+			continue;
+			}
+			pipeline(x1.split,num_com,line); 
 	      } 
 	      else{ 
 		      if(strchr(x1.input,'>') != NULL) 
-			      redi = 1;
-		     parse_arg(&x2,x1.input); 
+			      redirect= 1;
+		   err =  parse_arg(&x2,x1.input); 
 	      	} 
 	
 
@@ -245,22 +287,40 @@ int main(void)
 	/*non built in commands will be carried out by the exec function 
      	* the child process executes the command 
       	* the parent waits for the child to execute the process and displays its return status*/
-             if(strcmp(x1.input, "pwd") && strcmp(x1.input, "cd") && num_com == 0 ){
+             if(strcmp(x1.input, "pwd") && strcmp(x1.input, "cd") && num_com == 0 ){ 
+		int fd;
+		if(err == 1) { 
+			fprintf(stderr,"Error: too many process arguments\n"); 
+			continue; 
+		}
+		if (redirect == 1){
+			if(x2.file[0] == '\0' ){
+                                fprintf(stderr,"Error: no output file\n");
+                                continue;
+              		} 
+		       	       
+	       			
+			if ((fd = open(x2.file, O_WRONLY | O_CREAT | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1) {
+                              	fprintf(stderr,"Error: cannot open output file\n");
+                              	continue;
+            		}  
+			if(x2.cmd == NULL){
+                                fprintf(stderr,"Error: missing command\n");
+                                continue;
+                        }
+		}		
 		pid = fork();
                 if(pid ==0){
                  /*child*/ 
-		if(redi == 1){
-			int fd;
-        		if ((fd = open(x2.file, O_WRONLY | O_CREAT | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1) {            
-        			perror (x2.file);
-        			exit (EXIT_FAILURE);
-    			}
+		
+		if(redirect == 1){
         	
         		dup2(fd, 1); 
 			close(fd);
 		}
-                execvp(x2.cmd,x2.args);
-                perror("execvp");
+                
+		execvp(x2.cmd,x2.args);
+                fprintf(stderr,"Error: command not found\n");
                 exit(1);
                 } else if (pid >0){ 
                   /*parent*/ 
@@ -272,8 +332,7 @@ int main(void)
 
 		
                 /* Regular command */
-                fprintf(stdout, "Return status value for '%s': %d\n",
-                        line, retval); 
+                fprintf(stdout, "+ completed  '%s' [%d]\n",line, retval); 
 	     } 
 
 	      /* Builtin command current Directory */
@@ -284,7 +343,11 @@ int main(void)
  		
 		 /* Builtin command change Directory */
                 if (!strcmp(x1.input, "cd")) {  	
-				chdir(x1.split[0].args[1]);
+				if(chdir(x1.split[0].args[1]) < 0){ 
+					fprintf(stderr,"Error: cannot cd into directory\n");
+                                	retval = 1;
+                        }
+			fprintf(stdout, "+ completed  '%s' [%d]\n",line, retval);               
 
                 }
 
