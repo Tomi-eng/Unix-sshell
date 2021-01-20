@@ -254,7 +254,8 @@ int main(void)
                 
 		strcpy(line, x1.input); 
 		/* Builtin command */
-                if (!strcmp(x1.input, "exit")) {
+                if (!strcmp(x1.input, "exit")) { 
+			fprintf(stdout,"Bye...\n");
                         fprintf(stderr, "+ completed  '%s' [%d]\n",line, retval);
                         break;
                 }	
