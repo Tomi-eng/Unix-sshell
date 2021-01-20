@@ -186,7 +186,7 @@ int parse_arg(struct command *obj,char str[]){
 /*seperates the input into their different commands after pipe is encountered 
  *calls parse_arg after to split the command further into its arguments 
  */
-int parse_cmd(struct std_in  *obj,char *str){
+int parse_cmd(struct std_in  *obj,char str[]){
         struct command *x1; 
         char delim[] = "|";
         char *ptr = strtok(str, delim);
@@ -219,50 +219,62 @@ int main(void)
 	char *args[] = {"", NULL};*/ 
 
 	
-        char line[CMDLINE_MAX];	
+        char line[CMDLINE_MAX];
+	char s[100]; 
+	
+                
 		
 
-        while (1) {  
-		int num_com = 0; 
-		struct std_in x1;	 
-		struct command x2; 
+        while (1) {    
+		
+		int num_com = 0;
 		int redirect=0;
                 char *nl;
                 int retval =0; 
 		pid_t pid; 
 		int err = 0; 
-		
-
+		char *ptr;
+		 struct command x2; 
+		 struct std_in x1;
                 /* Print prompt */
                 printf("sshell$ ");
                 fflush(stdout);
 
                 /* Get command line */
-                fgets(x1.input, CMDLINE_MAX, stdin); 	
+                fgets(line, CMDLINE_MAX, stdin); 	
                 
 
                 /* Print command line if stdin is not provided by terminal */
                 if (!isatty(STDIN_FILENO)) {
-                        printf("%s", x1.input);
+                        printf("%s", line);
                         fflush(stdout);
                 }
 
                 /* Remove trailing newline from command line */
-                nl = strchr(x1.input,'\n');
+                nl = strchr(line,'\n');
                 if (nl)
                         *nl = '\0';
                 
-		strcpy(line, x1.input); 
+		strcpy(x1.input,line); 
+	       	
+		/* Builtin command current Directory */
+                if (!strcmp(line, "pwd")) { 
+                        fprintf(stdout, "%s\n", getcwd(s,100));
+                        fprintf(stdout, "+ completed '%s' [%d]\n",line, retval);
+
+
+                } 
+		                 	
 		/* Builtin command */
-                if (!strcmp(x1.input, "exit")) { 
-			fprintf(stdout,"Bye...\n");
-                        fprintf(stderr, "+ completed  '%s' [%d]\n",line, retval);
+                if (!strcmp(line, "exit")) { 
+			fprintf(stderr,"Bye...\n");
+                        fprintf(stderr, "+ completed '%s' [%d]\n",line, retval);
                         break;
                 }	
 		
 
-		char *ptr = strchr(x1.input, '|'); 
-		char *rdptr =strchr(x1.input, '>'); 	
+		ptr = strchr(line, '|'); 
+		char *rdptr =strchr(line, '>'); 	
               if(ptr !=  NULL){   
 		      	if((ptr && rdptr != NULL) && ptr > rdptr){ 
 				fprintf(stderr,"Error: mislocated output redirection\n");
@@ -280,7 +292,13 @@ int main(void)
 			      redirect= 1;
 		   err =  parse_arg(&x2,x1.input); 
 	      	} 
-	
+	                                 /* Builtin command change Directory */
+                if (!strcmp(x1.input, "cd")) {
+                         chdir(x2.args[1]);      
+                        fprintf(stdout, "+ completed '%s' [%d]\n",line, retval);
+                        continue;
+
+                } 
 
 
 		  
@@ -333,24 +351,8 @@ int main(void)
 
 		
                 /* Regular command */
-                fprintf(stdout, "+ completed  '%s' [%d]\n",line, retval); 
+                fprintf(stdout, "+ completed '%s' [%d]\n",line, retval); 
 	     } 
-
-	      /* Builtin command current Directory */
-                if (!strcmp(x1.input, "pwd")) {
-                        fprintf(stdout, "%s\n", getcwd(x1.input,sizeof(x1.input)));
-                       
-                }
- 		
-		 /* Builtin command change Directory */
-                if (!strcmp(x1.input, "cd")) {  	
-				if(chdir(x1.split[0].args[1]) < 0){ 
-					fprintf(stderr,"Error: cannot cd into directory\n");
-                                	retval = 1;
-                        }
-			fprintf(stdout, "+ completed  '%s' [%d]\n",line, retval);               
-
-                }
 
         }
 
