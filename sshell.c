@@ -125,10 +125,10 @@ void pipeline (struct command p[], int num_com,char *line){
        
 
       		
-	fprintf(stdout, "+ completed  '%s' [%d]",line,retval[0]);
+	fprintf(stderr, "+ completed  '%s' [%d]",line,retval[0]);
       	for (int i = 1; i < num_com ; i++)
-        	fprintf(stdout, "[%d]",retval[i]); 
-	fprintf(stdout,"\n");
+        	fprintf(stderr, "[%d]",retval[i]); 
+	fprintf(stderr,"\n");
 }  
 
 void set_file(struct command *obj,char file[]){
@@ -237,7 +237,7 @@ int main(void)
 		 struct command x2; 
 		 struct std_in x1;
                 /* Print prompt */
-                printf("sshell$ ");
+                printf("sshell@ucd$ ");
                 fflush(stdout);
 
                 /* Get command line */
@@ -260,7 +260,7 @@ int main(void)
 		/* Builtin command current Directory */
                 if (!strcmp(line, "pwd")) { 
                         fprintf(stdout, "%s\n", getcwd(s,100));
-                        fprintf(stdout, "+ completed '%s' [%d]\n",line, retval);
+                        fprintf(stderr, "+ completed '%s' [%d]\n",line, retval);
 
 
                 } 
@@ -295,7 +295,7 @@ int main(void)
 	                                 /* Builtin command change Directory */
                 if (!strcmp(x1.input, "cd")) {
                          chdir(x2.args[1]);      
-                        fprintf(stdout, "+ completed '%s' [%d]\n",line, retval);
+                        fprintf(stderr, "+ completed '%s' [%d]\n",line, retval);
                         continue;
 
                 } 
@@ -351,7 +351,7 @@ int main(void)
 
 		
                 /* Regular command */
-                fprintf(stdout, "+ completed '%s' [%d]\n",line, retval); 
+                fprintf(stderr, "+ completed '%s' [%d]\n",line, retval); 
 	     } 
 
         }
