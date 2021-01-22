@@ -9,6 +9,12 @@
 
 #define CMDLINE_MAX 512  
 
+
+struct alphabet
+{
+  char set[32];
+}; 
+
  struct command
 {
         char *cmd;
@@ -104,6 +110,16 @@ void pipeline (struct command p[], int num_com,char *line){
 				dup2(fd[4], 0);
 
 	     		
+			if(p[num_com-1].file[0] != '\0'){  
+				int fp;
+				if ((fp = open(p[num_com-1].file, O_WRONLY | O_CREAT | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1) {
+                                fprintf(stderr,"Error: cannot open output file\n");
+                                return;
+                              	}  
+				dup2(fp,1);	
+
+			}	 
+		
 			for(int i =0;i < ((num_com - 1) * 2) ;i++)
                        		close(fd[i]);	
 
@@ -146,7 +162,8 @@ void set_file(struct command *obj,char file[]){
  */
 int parse_arg(struct command *obj,char str[]){  
 	char ch = '>'; 
-      	char file[32];	
+      	char file[32]; 
+      	memset(obj->file, '\0', sizeof(char) );	
   	if( strchr(str, ch) != NULL){
    	char *xtr = strchr(str, ch); 
    	xtr  = xtr +1; 
@@ -219,7 +236,11 @@ int main(void)
 	char *args[] = {"", NULL};*/ 
 
 	
-        char line[CMDLINE_MAX];
+        char line[CMDLINE_MAX];  
+	// set array to ""        		
+	struct alphabet x3[26]; 
+	for(int i= 0; i <26; i++)
+        	memset(x3[i].set, '\0', sizeof(char) );
 	char s[100]; 
 	
                 
@@ -234,8 +255,8 @@ int main(void)
 		pid_t pid; 
 		int err = 0; 
 		char *ptr;
-		 struct command x2; 
-		 struct std_in x1;
+		struct command x2; 
+		struct std_in x1;
                 /* Print prompt */
                 printf("sshell@ucd$ ");
                 fflush(stdout);
@@ -257,21 +278,6 @@ int main(void)
                 
 		strcpy(x1.input,line); 
 	       	
-		/* Builtin command current Directory */
-                if (!strcmp(line, "pwd")) { 
-                        fprintf(stdout, "%s\n", getcwd(s,100));
-                        fprintf(stderr, "+ completed '%s' [%d]\n",line, retval);
-
-
-                } 
-		                 	
-		/* Builtin command */
-                if (!strcmp(line, "exit")) { 
-			fprintf(stderr,"Bye...\n");
-                        fprintf(stderr, "+ completed '%s' [%d]\n",line, retval);
-                        break;
-                }	
-		
 
 		ptr = strchr(line, '|'); 
 		char *rdptr =strchr(line, '>'); 	
@@ -286,19 +292,105 @@ int main(void)
 			continue;
 			}
 			pipeline(x1.split,num_com,line); 
+		       	continue;	
 	      } 
 	      else{ 
 		      if(strchr(x1.input,'>') != NULL) 
 			      redirect= 1;
 		   err =  parse_arg(&x2,x1.input); 
 	      	} 
-	                                 /* Builtin command change Directory */
+	      
+	      	/* check for $ and replace with string in array*/ 
+	     	int t =0; 
+	    	int break_ =0; 
+	       	while(x2.args[t] != NULL && strcmp(x2.args[0], "set") ){	 
+			  
+			ptr = strchr(x2.args[t],'$');  
+		       	if(ptr != NULL){  
+				int len= strlen(x2.args[t]);
+                        	if(len > 2){
+                                	fprintf(stderr, "Error: invalid variable name\n");
+                                	break_++;
+					break;
+                        	}	
+				ptr = ptr +1;
+				char j = *ptr;
+				if('a'<= j  && j <= 'z'){ 
+                                        int k = j - 'a';  
+                                        x2.args[t] = x3[k].set; 
+				} 
+				else{ 
+					fprintf(stderr, "Error: invalid variable name\n");
+                        		break_++;
+					break;
+				}	
+		       	}	
+			t++; 
+		} 
+	   	
+	      	if( break_ >0)
+	      		continue;	       
+
+
+	      	  /* Builtin command current Directory */
+                if (!strcmp(line, "pwd")) {
+                        fprintf(stdout, "%s\n", getcwd(s,100));
+                        fprintf(stderr, "+ completed '%s' [%d]\n",line, retval);
+
+
+                }
+
+                /* Builtin command */
+                if (!strcmp(line, "exit")) {
+                        fprintf(stderr,"Bye...\n");
+                        fprintf(stderr, "+ completed '%s' [%d]\n",line, retval);
+                        break;
+                }
+
+
+	      	/* Builtin command change Directory */
                 if (!strcmp(x1.input, "cd")) {
-                         chdir(x2.args[1]);      
+                       int cd =  chdir(x2.args[1]);   
+		   	if( cd < 0){ 
+			       	fprintf(stderr,"Error: cannot cd into directory\n");	
+				fprintf(stderr, "+ completed '%s' [%d]\n",line, ++retval);
+                        	continue;
+			}	
                         fprintf(stderr, "+ completed '%s' [%d]\n",line, retval);
                         continue;
 
                 } 
+		
+		/* Builtin command set */ 
+		if (!strcmp(x1.input, "set")) { 
+        		char arg[2];  
+		       	if( x2.args[1] == NULL){ 
+				fprintf(stderr, "Error: invalid variable name\n"); 
+				fprintf(stderr, "+ completed '%s' [%d]\n",line, ++retval);
+                                continue;
+			}	
+			int length= strlen(x2.args[1]);
+			if(length > 1){ 
+			 	fprintf(stderr, "Error: invalid variable name\n"); 
+				fprintf(stderr, "+ completed '%s' [%d]\n",line, ++retval);
+                                continue;
+			}				
+       			strcpy(arg, x2.args[1] ); 
+      			char x= arg[0]; 
+      			int y = (int)x; 
+      			int z = y - 97;
+ 			if( z <= 25){  
+				strcpy(x3[z].set,x2.args[2]); 
+			       	fprintf(stderr, "+ completed '%s' [%d]\n",line, retval); 
+			} 
+			else {
+				fprintf(stderr, "Error: invalid variable name\n");  
+				fprintf(stderr, "+ completed '%s' [%d]\n",line, ++retval);
+				continue; 
+			}	
+		}	
+	
+  
 
 
 		  
@@ -306,12 +398,15 @@ int main(void)
 	/*non built in commands will be carried out by the exec function 
      	* the child process executes the command 
       	* the parent waits for the child to execute the process and displays its return status*/
-             if(strcmp(x1.input, "pwd") && strcmp(x1.input, "cd") && num_com == 0 ){ 
+             if(strcmp(x1.input, "pwd") && strcmp(x1.input, "cd") && strcmp(x1.input, "set") && num_com == 0 ){ 
 		int fd;
 		if(err == 1) { 
 			fprintf(stderr,"Error: too many process arguments\n"); 
 			continue; 
-		}
+		} 
+		if(x2.args[0] == NULL){
+                                continue;
+                 }
 		if (redirect == 1){
 			if(x2.file[0] == '\0' ){
                                 fprintf(stderr,"Error: no output file\n");
@@ -323,7 +418,7 @@ int main(void)
                               	fprintf(stderr,"Error: cannot open output file\n");
                               	continue;
             		}  
-			if(x2.cmd == NULL){
+			if(x2.args[0] == NULL){
                                 fprintf(stderr,"Error: missing command\n");
                                 continue;
                         }
@@ -338,7 +433,7 @@ int main(void)
 			close(fd);
 		}
                 
-		execvp(x2.cmd,x2.args);
+		execvp(x2.args[0],x2.args);
                 fprintf(stderr,"Error: command not found\n");
                 exit(1);
                 } else if (pid >0){ 
