@@ -8,30 +8,37 @@
 #include <fcntl.h>
 
 #define CMDLINE_MAX 512  
+#define TOKEN_MAX 32 
+#define ARG_MAX 17
+#define PIPE_MAX 4
+#define ALPHABET_MAX 26
 
-
+// holds possible string for each alphabet replaced by a string with set 
 struct alphabet
 {
-  char set[32];
+  char set[TOKEN_MAX];
 }; 
 
- struct command
+//each command has the main command, its arguments and possibly a file to redirect the command to 
+struct command
 {
         char *cmd;
-        char *args[17];
-        char x[32];
-        char file[32];
+        char *args[ARG_MAX];
+        char x[TOKEN_MAX];
+        char file[TOKEN_MAX];
 };
 
+
+//takes in raw input from user that includes pipes unparsed
 struct std_in
 {
         char input[CMDLINE_MAX];
-        struct command split[4];
+        struct command split[PIPE_MAX];
 };
 
 
 void pipeline (struct command p[], int num_com,char *line){ 
-       	num_com++; 
+       	num_com++;//number of commands were counted from zero instead of one 
 	pid_t pid;	
 	int fd[6]; 
         int status;	
@@ -44,9 +51,9 @@ void pipeline (struct command p[], int num_com,char *line){
 	pid = fork();	
 	if (pid == 0)
     {
-      		// replace cat's stdout with write part of 1st pipe
+      		// replace  stdout with write part of 1st pipe
 
-      		dup2(fd[1], 1);
+      		dup2(fd[1], STDOUT_FILENO);
 
       		// close all pipes
       		for(int i =0;i < ((num_com - 1) * 2) ;i++) 
@@ -63,11 +70,11 @@ void pipeline (struct command p[], int num_com,char *line){
 		
 			
 	  
-	  		dup2(fd[0], 0);
+	  		dup2(fd[0], STDIN_FILENO);
 
 	  	
 
-	  		dup2(fd[3], 1);
+	  		dup2(fd[3], STDOUT_FILENO);
 
 	  		
 			for(int i =0;i < ((num_com - 1) * 2) ;i++)
@@ -85,9 +92,9 @@ void pipeline (struct command p[], int num_com,char *line){
                 	{
                        		
 				
-                        	dup2(fd[2], 0);
+                        	dup2(fd[2], STDIN_FILENO);
                         	
-                        	dup2(fd[5], 1);
+                        	dup2(fd[5], STDOUT_FILENO);
                         	
 				for(int i =0;i < ((num_com - 1) * 2) ;i++)
                        			close(fd[i]);
@@ -103,20 +110,20 @@ void pipeline (struct command p[], int num_com,char *line){
                 {
                     	
 			if(num_com == 2) 
-				dup2(fd[0], 0); 
+				dup2(fd[0], STDIN_FILENO); 
 			else if(num_com == 3) 
-				dup2(fd[2], 0); 
+				dup2(fd[2], STDIN_FILENO); 
 			else 
-				dup2(fd[4], 0);
+				dup2(fd[4], STDIN_FILENO);
 
-	     		
+	     	//if the last command in the pipe is to be redirected	
 			if(p[num_com-1].file[0] != '\0'){  
 				int fp;
-				if ((fp = open(p[num_com-1].file, O_WRONLY | O_CREAT | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1) {
+				if ((fp = open(p[num_com-1].file, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IRGRP | S_IWGRP | S_IWUSR)) == -1) {
                                 fprintf(stderr,"Error: cannot open output file\n");
                                 return;
                               	}  
-				dup2(fp,1);	
+				dup2(fp,STDOUT_FILENO);	
 
 			}	 
 		
@@ -147,6 +154,8 @@ void pipeline (struct command p[], int num_com,char *line){
 	fprintf(stderr,"\n");
 }  
 
+
+//stores parsed file in the file array of the command object
 void set_file(struct command *obj,char file[]){
 	char *ptr = file;
  	while( *ptr == ' ')
@@ -162,14 +171,17 @@ void set_file(struct command *obj,char file[]){
  */
 int parse_arg(struct command *obj,char str[]){  
 	char ch = '>'; 
-      	char file[32]; 
+      	char file[TOKEN_MAX]; 
       	memset(obj->file, '\0', sizeof(char) );	
   	if( strchr(str, ch) != NULL){
-   	char *xtr = strchr(str, ch); 
+   	char *xtr = strchr(str, ch);   
+	//the filename is right after the > ,so we increment it
    	xtr  = xtr +1; 
  	strcpy(file, xtr); 
-       	set_file(obj,file);	
-	xtr--;
+       	set_file(obj,file);//function to get rid of any space character after the > till the file name is encountered 
+	//> and file are not commands so after the file is stored, we want 
+	//to remove them from the input before we parse through the actual command and its arguments	
+	xtr--; 
    	while( *xtr != '\0'){
     		*xtr = '\0';  
      		xtr++;  
@@ -191,7 +203,9 @@ int parse_arg(struct command *obj,char str[]){
 			count = count + 1;
 			obj->args[count] = ptr ;
  		} 
-   	}	  
+   	}	   
+
+	//if count == 16, there are too many arguments
     	if(count == 16){ 
        		return 1; 
 	}	 
@@ -223,7 +237,7 @@ int parse_cmd(struct std_in  *obj,char str[]){
            x1 = &obj->split[i];
            parse_arg( x1, x1->x);
         }
-        
+       //returns number of commands seperated by the pipe 
      	 return count;
 
 }
@@ -232,28 +246,23 @@ int parse_cmd(struct std_in  *obj,char str[]){
 
 int main(void)
 {
-        /*char cmd[CMDLINE_MAX]; 
-	char *args[] = {"", NULL};*/ 
-
+        
 	
         char line[CMDLINE_MAX];  
-	// set array to ""        		
-	struct alphabet x3[26]; 
-	for(int i= 0; i <26; i++)
+	// initialize  set array to ""        		
+	struct alphabet x3[ALPHABET_MAX]; 
+	for(int i= 0; i <ALPHABET_MAX; i++)
         	memset(x3[i].set, '\0', sizeof(char) );
 	char s[100]; 
 	
-                
-		
-
         while (1) {    
 		
-		int num_com = 0;
-		int redirect=0;
+		int num_com = 0;//number of commands seperated by pipe
+		int redirect=0;//counter if we have to redirect
                 char *nl;
                 int retval =0; 
 		pid_t pid; 
-		int err = 0; 
+		int err = 0;//counter if something went wrong in the command parser 
 		char *ptr;
 		struct command x2; 
 		struct std_in x1;
@@ -278,46 +287,49 @@ int main(void)
                 
 		strcpy(x1.input,line); 
 	       	
-
+		//check for pipe , if there are commands split call parse-cmd otherwise no pipes and we just have one command, call parse_arg
 		ptr = strchr(line, '|'); 
 		char *rdptr =strchr(line, '>'); 	
-              if(ptr !=  NULL){   
+              if(ptr !=  NULL){  
+		    	//if there is a pipe after an output redirection  
 		      	if((ptr && rdptr != NULL) && ptr > rdptr){ 
 				fprintf(stderr,"Error: mislocated output redirection\n");
                                 continue;
 			}				
-			num_com = parse_cmd(&x1,x1.input); 
+			num_com = parse_cmd(&x1,x1.input);  
+			//a pipe must have a minimum of two commands
 		        if(num_com < 1){ 
 			fprintf(stderr,"Error: missing command\n");
 			continue;
-			}
+			} 
+			
 			pipeline(x1.split,num_com,line); 
 		       	continue;	
 	      } 
 	      else{ 
 		      if(strchr(x1.input,'>') != NULL) 
 			      redirect= 1;
-		   err =  parse_arg(&x2,x1.input); 
+		   err =  parse_arg(&x2,x1.input); //err is 1 if there are too many arguments
 	      	} 
 	      
-	      	/* check for $ and replace with string in array*/ 
-	     	int t =0; 
+	      	/* check for $ and replace with string in set array*/ 
+	     	int arg_count =0; 
 	    	int break_ =0; 
-	       	while(x2.args[t] != NULL && strcmp(x2.args[0], "set") ){	 
+	       	while(x2.args[arg_count] != NULL && strcmp(x2.args[0], "set") ){	 
 			  
-			ptr = strchr(x2.args[t],'$');  
+			ptr = strchr(x2.args[arg_count],'$');  
 		       	if(ptr != NULL){  
-				int len= strlen(x2.args[t]);
+				int len= strlen(x2.args[arg_count]);//checks to see if the pointer to $a $b and so on only has 2 characters and not more like $jpl
                         	if(len > 2){
                                 	fprintf(stderr, "Error: invalid variable name\n");
                                 	break_++;
 					break;
                         	}	
-				ptr = ptr +1;
+				ptr = ptr +1;//increments the pointer to the character after $ to check if it is an  alphabet in lowercase 
 				char j = *ptr;
 				if('a'<= j  && j <= 'z'){ 
                                         int k = j - 'a';  
-                                        x2.args[t] = x3[k].set; 
+                                        x2.args[arg_count] = x3[k].set; 
 				} 
 				else{ 
 					fprintf(stderr, "Error: invalid variable name\n");
@@ -325,10 +337,10 @@ int main(void)
 					break;
 				}	
 		       	}	
-			t++; 
+			arg_count++; 
 		} 
 	   	
-	      	if( break_ >0)
+	      	if( break_ >0)//if any error occured in the set function, loop back to the start of the shell
 	      		continue;	       
 
 
@@ -340,7 +352,7 @@ int main(void)
 
                 }
 
-                /* Builtin command */
+                /* Builtin command exit */
                 if (!strcmp(line, "exit")) {
                         fprintf(stderr,"Bye...\n");
                         fprintf(stderr, "+ completed '%s' [%d]\n",line, retval);
@@ -369,7 +381,8 @@ int main(void)
 				fprintf(stderr, "+ completed '%s' [%d]\n",line, ++retval);
                                 continue;
 			}	
-			int length= strlen(x2.args[1]);
+			int length= strlen(x2.args[1]); 
+			
 			if(length > 1){ 
 			 	fprintf(stderr, "Error: invalid variable name\n"); 
 				fprintf(stderr, "+ completed '%s' [%d]\n",line, ++retval);
@@ -378,8 +391,13 @@ int main(void)
        			strcpy(arg, x2.args[1] ); 
       			char x= arg[0]; 
       			int y = (int)x; 
-      			int z = y - 97;
- 			if( z <= 25){  
+      			int z = y - 97;  //97 ascii code for 'a'
+ 			if(0 <= z && z <= 25){   
+				if(x2.args[2]== NULL){ 
+				fprintf(stderr, "+ completed '%s' [%d]\n",line,retval); 
+				continue;
+
+				}
 				strcpy(x3[z].set,x2.args[2]); 
 			       	fprintf(stderr, "+ completed '%s' [%d]\n",line, retval); 
 			} 
@@ -399,25 +417,28 @@ int main(void)
      	* the child process executes the command 
       	* the parent waits for the child to execute the process and displays its return status*/
              if(strcmp(x1.input, "pwd") && strcmp(x1.input, "cd") && strcmp(x1.input, "set") && num_com == 0 ){ 
-		int fd;
+		int fd; 
+
 		if(err == 1) { 
 			fprintf(stderr,"Error: too many process arguments\n"); 
 			continue; 
 		} 
+	       //no command provided	
 		if(x2.args[0] == NULL){
                                 continue;
                  }
-		if (redirect == 1){
+		if (redirect == 1){ 
 			if(x2.file[0] == '\0' ){
                                 fprintf(stderr,"Error: no output file\n");
                                 continue;
               		} 
 		       	       
 	       			
-			if ((fd = open(x2.file, O_WRONLY | O_CREAT | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1) {
+			if ((fd = open(x2.file, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IRGRP | S_IWGRP | S_IWUSR)) == -1) {
                               	fprintf(stderr,"Error: cannot open output file\n");
                               	continue;
             		}  
+			//no command to redirect 
 			if(x2.args[0] == NULL){
                                 fprintf(stderr,"Error: missing command\n");
                                 continue;
@@ -429,7 +450,7 @@ int main(void)
 		
 		if(redirect == 1){
         	
-        		dup2(fd, 1); 
+        		dup2(fd, STDOUT_FILENO); 
 			close(fd);
 		}
                 
