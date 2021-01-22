@@ -1,5 +1,5 @@
-all: sshell.c
-	cc -c sshell.c -Wall -Werror -Wextra
+sshell: sshell.c
+	gcc -o sshell sshell.c -Wall -Werror -Wextra
 
 clean:
 	-rm -f *.o sshell
