@@ -121,6 +121,68 @@ void pipeline(struct command p[], int num_com, char *line) {
         fprintf(stderr, "[%d]", retval[i]);
     fprintf(stderr, "\n");
 }
+ 
+
+void exit_command(int retval, char line[]){ 
+ 	fprintf(stderr, "Bye...\n");
+      	fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
+} 
+
+
+void pwd_command(int retval, char line[]){   
+	char cwd[100];
+	fprintf(stdout, "%s\n", getcwd(cwd, sizeof(cwd)));
+      	fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
+} 
+
+
+void set_command(struct alphabet *lowercases ,struct command *obj, int retval,char line[]){ 
+  	char arg[2];
+    	if (obj->args[1] == NULL) {
+                fprintf(stderr, "Error: invalid variable name\n");
+                fprintf(stderr, "+ completed '%s' [%d]\n", line, ++retval);
+                return;
+            }
+
+            int length = strlen(obj->args[1]);
+            if (length > 1) {
+                fprintf(stderr, "Error: invalid variable name\n");
+                fprintf(stderr, "+ completed '%s' [%d]\n", line, ++retval);
+                return;
+            }
+            strcpy(arg, obj->args[1]);
+            /* Here we compute the ASCII code to check if it's within range */
+            int var_code = (int)arg[0] - 'a';
+            if (0 <= var_code && var_code <= 25) {
+                if (obj->args[2] == NULL) {
+                    fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
+                    return;
+                } 
+		lowercases = lowercases + var_code;
+                strcpy(lowercases->set, obj->args[2]); 
+		lowercases = lowercases -  var_code;
+                fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
+            } else {
+                fprintf(stderr, "Error: invalid variable name\n");
+                fprintf(stderr, "+ completed '%s' [%d]\n", line, ++retval);
+                return;
+            }
+
+} 
+
+
+void cd_command(struct command *obj,int retval,char line[]){ 
+
+	int cd = chdir(obj->args[1]);
+       	if (cd < 0) {
+         	fprintf(stderr, "Error: cannot cd into directory\n");
+                fprintf(stderr, "+ completed '%s' [%d]\n", line, ++retval);
+                return;
+            }
+            fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
+            return;
+}
+
 
 /* Stores parsed file in the file array of the command object */
 void set_file(struct command *obj, char file[]) {
@@ -208,7 +270,7 @@ int main(void) {
     for (int i = 0; i < ALPHABET_MAX; i++)
         memset(lowercases[i].set, '\0', sizeof(char));
 
-    char cwd[100];
+   
 
     while (1) {
         int num_com = 0; // Number of commands separated by pipe
@@ -301,60 +363,28 @@ int main(void) {
 
         /* Built in command current directory */
         if (!strcmp(line, "pwd")) {
-            fprintf(stdout, "%s\n", getcwd(cwd, sizeof(cwd)));
-            fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
+            pwd_command(retval,line); 
+	    continue;
         }
 
         /* Built in command exit */
         if (!strcmp(line, "exit")) {
-            fprintf(stderr, "Bye...\n");
-            fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
+            exit_command(retval,line);
             break;
         }
 
         /* Built in command change directory */
         if (!strcmp(piped_commands.input, "cd")) {
-            int cd = chdir(command.args[1]);
-            if (cd < 0) {
-                fprintf(stderr, "Error: cannot cd into directory\n");
-                fprintf(stderr, "+ completed '%s' [%d]\n", line, ++retval);
-                continue;
-            }
-            fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
+            cd_command(&command,retval,line);
             continue;
         }
 
         /* Builtin command set */
         if (!strcmp(piped_commands.input, "set")) {
-            char arg[2];
-            if (command.args[1] == NULL) {
-                fprintf(stderr, "Error: invalid variable name\n");
-                fprintf(stderr, "+ completed '%s' [%d]\n", line, ++retval);
-                continue;
+       	     	set_command(lowercases,&command,retval,line);
+            	continue;
             }
-
-            int length = strlen(command.args[1]);
-            if (length > 1) {
-                fprintf(stderr, "Error: invalid variable name\n");
-                fprintf(stderr, "+ completed '%s' [%d]\n", line, ++retval);
-                continue;
-            }
-            strcpy(arg, command.args[1]);
-            /* Here we compute the ASCII code to check if it's within range */
-            int var_code = (int)arg[0] - 'a';
-            if (0 <= var_code && var_code <= 25) {
-                if (command.args[2] == NULL) {
-                    fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
-                    continue;
-                }
-                strcpy(lowercases[var_code].set, command.args[2]);
-                fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
-            } else {
-                fprintf(stderr, "Error: invalid variable name\n");
-                fprintf(stderr, "+ completed '%s' [%d]\n", line, ++retval);
-                continue;
-            }
-        }
+       
 
         /* Non-built in commands will be carried out by the exec function
          * The child process executes the command
