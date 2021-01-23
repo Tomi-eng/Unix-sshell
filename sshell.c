@@ -270,7 +270,7 @@ int parse_cmd(struct std_in *obj, char str[]) {
 
 
 /* Replaces any user-defined variables with their respective values */
-void replace_var_name(struct command *command, struct alphabet *lowercases, int arg_count, int* break_) {
+void replace_var_name(struct command *command, struct alphabet *lowercases, int arg_count, int *break_) {
     while (command->args[arg_count] != NULL && strcmp(command->args[0], "set")) {
         char *ptr;
         ptr = strchr(command->args[arg_count], '$');
@@ -411,7 +411,7 @@ int main(void) {
                 continue;
             }
             /* No command provided	 */
-            if (command.args[0] == NULL && redirect!= 1) {
+            if (command.args[0] == NULL && redirect != 1) {
                 continue;
             }
             /* If we want output redirection but did not receive a file */
