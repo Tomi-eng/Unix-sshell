@@ -9,7 +9,7 @@ Winter 2021.
 
 The most prominent design choice that stands out was the separation of the
 parser functionality into two main, separate functions **parse_cmd** and
-**parse_ar**.  This was mainly done at the point where we started to implement
+**parse_arg**. This was mainly done at the point where we started to implement
 functionality for pipelining, as in cases where we received a pipeline of
 commands, we not only needed to separate the command name from the arguments in
 each command, but also to separate each piped command from one another. As a
