@@ -397,7 +397,7 @@ int main(void) {
                 continue;
             }
             /* No command provided	 */
-            if (command.args[0] == NULL) {
+            if (command.args[0] == NULL && redirect!= 1) {
                 continue;
             }
             /* If we want output redirection but did not receive a file */
