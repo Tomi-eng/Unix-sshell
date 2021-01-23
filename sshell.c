@@ -32,7 +32,6 @@ struct std_in {
 };
 
 
-/* Pipeline handler */
 void pipeline(struct command p[], int num_com, char *line) {
     // We're off by one when entering this function, therefore increment num_com first
     num_com++;
@@ -126,14 +125,12 @@ void pipeline(struct command p[], int num_com, char *line) {
 }
 
 
-/* Built-in exit command */
 void exit_command(int retval, char line[]) {
     fprintf(stderr, "Bye...\n");
     fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
 }
 
 
-/* Built-in pwd command */
 void pwd_command(int retval, char line[]) {
     char cwd[CWD_MAX];
     fprintf(stdout, "%s\n", getcwd(cwd, sizeof(cwd)));
@@ -141,7 +138,6 @@ void pwd_command(int retval, char line[]) {
 }
 
 
-/* Built-in set command */
 void set_command(struct alphabet *lowercases, struct command *obj, int retval, char line[]) {
     char arg[2];
     if (obj->args[1] == NULL) {
@@ -176,7 +172,6 @@ void set_command(struct alphabet *lowercases, struct command *obj, int retval, c
 }
 
 
-/* Built-in cd command */
 void cd_command(struct command *obj, int retval, char line[]) {
     int cd = chdir(obj->args[1]);
     if (cd < 0) {
@@ -269,6 +264,36 @@ int parse_cmd(struct std_in *obj, char str[]) {
 }
 
 
+/* Replaces any user-defined variables with their respective values */
+void replace_var_name(struct command *command, struct alphabet *lowercases, int arg_count, int* break_) {
+    while (command->args[arg_count] != NULL && strcmp(command->args[0], "set")) {
+        char *ptr;
+        ptr = strchr(command->args[arg_count], '$');
+        if (ptr != NULL) {
+            /* Check length of variable name */
+            int len = strlen(command->args[arg_count]);
+            if (len > 2) {
+                fprintf(stderr, "Error: invalid variable name\n");
+                *break_ = *break_ + 1;
+                break;
+            }
+            /* Check the character after $ to see if it is lowercase */
+            ptr = ptr + 1;
+            char var_char = *ptr;
+            if ('a' <= var_char && var_char <= 'z') {
+                int var_num = var_char - 'a';
+                command->args[arg_count] = lowercases[var_num].set;
+            } else {
+                fprintf(stderr, "Error: invalid variable name\n");
+                *break_ = *break_ + 1;
+                break;
+            }
+        }
+        arg_count++;
+    }
+}
+
+
 int main(void) {
     char line[CMDLINE_MAX];
     struct alphabet lowercases[ALPHABET_MAX];
@@ -336,35 +361,14 @@ int main(void) {
         /* Check for $ and replace with string in set array */
         int arg_count = 0;
         int break_ = 0;
-
-        while (command.args[arg_count] != NULL && strcmp(command.args[0], "set")) {
-            ptr = strchr(command.args[arg_count], '$');
-            if (ptr != NULL) {
-                /* Check length of variable name */
-                int len = strlen(command.args[arg_count]);
-                if (len > 2) {
-                    fprintf(stderr, "Error: invalid variable name\n");
-                    break_++;
-                    break;
-                }
-                /* Check the character after $ to see if it is lowercase */
-                ptr = ptr + 1;
-                char var_char = *ptr;
-                if ('a' <= var_char && var_char <= 'z') {
-                    int var_num = var_char - 'a';
-                    command.args[arg_count] = lowercases[var_num].set;
-                } else {
-                    fprintf(stderr, "Error: invalid variable name\n");
-                    break_++;
-                    break;
-                }
-            }
-            arg_count++;
+        if (command.args[arg_count] != NULL && strcmp(command.args[0], "set")) {
+            replace_var_name(&command, lowercases, arg_count, &break_);
         }
 
-        /* If any error occurred in the set function, loop back to the start of the shell */
-        if (break_ > 0)
+        /* If any error occurred in replace_var_name, loop back to the start of the shell */
+        if (break_ > 0) {
             continue;
+        }
 
         /* Built in command current directory */
         if (!strcmp(line, "pwd")) {
