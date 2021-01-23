@@ -23,7 +23,28 @@ a change needed to be done, thus making it a good design choice.
 When implementing output redirection, we found that we needed to get rid of any
 spaces if encountered and clean up the file name; therefore, we decided to
 create a helper function set_file for parse_arg that did the cleaning by getting
-rid of any whitespaces.
+rid of any whitespaces. This kept our parser function better readable.
+
+* Refactoring built-in commands
+
+We refactored all built-in shell commands into their own dedicated functions
+(such as exit_command, pwd_command, etc), along with their error handling in
+order to keep the code clean and readable in main, along with the variable
+parsing function.
+
+* Set command
+
+For the set command, we decided to store the value of each variable in a simple
+array. We decided a static array was the best data structure for handling the
+variable feature as we know the max number of variables, and because the project
+required variables without a user-set value to output an empty string, we knew
+initializing all array indices to the empty string upon running the shell
+ensured such functionality. If a user ends up not using the set functionality at
+all or only a tiny subset of the variables are used, it could be considered
+wasteful, but considering the amount of space a static array of size 26 takes
+up, it seemed like a great tradeoff in comparison to dynamically creating a
+variable to hold the value each time, as the code gets a bit more complex by
+doing so.
 
 * Parsing Commands as Structs
 
@@ -47,12 +68,13 @@ simplified handling this error as it may be more complex to do error checking
 first and ensuring the command exists first before trying to execute the
 command.
 
-* Pipelining
+* Limitations
 
 We took advantage of the fact that, according to the project assignment, we
 would only be required up to pass cases for up to three pipes in regards to
 pipelining. Due to time, we were unable to make a scalable solution to work for
-more than three pipes.
+more than three pipes, so the limitations of our current shell is that it cannot
+support more than three pipes.
 
 ## References 
 
