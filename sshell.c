@@ -10,6 +10,7 @@
 #define ARG_MAX 17
 #define PIPE_MAX 4
 #define ALPHABET_MAX 26
+#define CWD_MAX 100
 
 /* Holds possible string for each alphabet replaced by a string with set */
 struct alphabet {
@@ -30,6 +31,8 @@ struct std_in {
     struct command split[PIPE_MAX];
 };
 
+
+/* Pipeline handler */
 void pipeline(struct command p[], int num_com, char *line) {
     // We're off by one when entering this function, therefore increment num_com first
     num_com++;
@@ -121,66 +124,67 @@ void pipeline(struct command p[], int num_com, char *line) {
         fprintf(stderr, "[%d]", retval[i]);
     fprintf(stderr, "\n");
 }
- 
-
-void exit_command(int retval, char line[]){ 
- 	fprintf(stderr, "Bye...\n");
-      	fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
-} 
 
 
-void pwd_command(int retval, char line[]){   
-	char cwd[100];
-	fprintf(stdout, "%s\n", getcwd(cwd, sizeof(cwd)));
-      	fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
-} 
+/* Built-in exit command */
+void exit_command(int retval, char line[]) {
+    fprintf(stderr, "Bye...\n");
+    fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
+}
 
 
-void set_command(struct alphabet *lowercases ,struct command *obj, int retval,char line[]){ 
-  	char arg[2];
-    	if (obj->args[1] == NULL) {
-                fprintf(stderr, "Error: invalid variable name\n");
-                fprintf(stderr, "+ completed '%s' [%d]\n", line, ++retval);
-                return;
-            }
-
-            int length = strlen(obj->args[1]);
-            if (length > 1) {
-                fprintf(stderr, "Error: invalid variable name\n");
-                fprintf(stderr, "+ completed '%s' [%d]\n", line, ++retval);
-                return;
-            }
-            strcpy(arg, obj->args[1]);
-            /* Here we compute the ASCII code to check if it's within range */
-            int var_code = (int)arg[0] - 'a';
-            if (0 <= var_code && var_code <= 25) {
-                if (obj->args[2] == NULL) {
-                    fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
-                    return;
-                } 
-		lowercases = lowercases + var_code;
-                strcpy(lowercases->set, obj->args[2]); 
-		lowercases = lowercases -  var_code;
-                fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
-            } else {
-                fprintf(stderr, "Error: invalid variable name\n");
-                fprintf(stderr, "+ completed '%s' [%d]\n", line, ++retval);
-                return;
-            }
-
-} 
+/* Built-in pwd command */
+void pwd_command(int retval, char line[]) {
+    char cwd[CWD_MAX];
+    fprintf(stdout, "%s\n", getcwd(cwd, sizeof(cwd)));
+    fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
+}
 
 
-void cd_command(struct command *obj,int retval,char line[]){ 
+/* Built-in set command */
+void set_command(struct alphabet *lowercases, struct command *obj, int retval, char line[]) {
+    char arg[2];
+    if (obj->args[1] == NULL) {
+        fprintf(stderr, "Error: invalid variable name\n");
+        fprintf(stderr, "+ completed '%s' [%d]\n", line, ++retval);
+        return;
+    }
 
-	int cd = chdir(obj->args[1]);
-       	if (cd < 0) {
-         	fprintf(stderr, "Error: cannot cd into directory\n");
-                fprintf(stderr, "+ completed '%s' [%d]\n", line, ++retval);
-                return;
-            }
+    int length = strlen(obj->args[1]);
+    if (length > 1) {
+        fprintf(stderr, "Error: invalid variable name\n");
+        fprintf(stderr, "+ completed '%s' [%d]\n", line, ++retval);
+        return;
+    }
+
+    strcpy(arg, obj->args[1]);
+    /* Here we compute the ASCII code to check if it's within range */
+    int var_code = (int)arg[0] - 'a';
+    if (0 <= var_code && var_code <= 25) {
+        if (obj->args[2] == NULL) {
             fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
             return;
+        }
+        lowercases = lowercases + var_code;
+        strcpy(lowercases->set, obj->args[2]);
+        fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
+    } else {
+        fprintf(stderr, "Error: invalid variable name\n");
+        fprintf(stderr, "+ completed '%s' [%d]\n", line, ++retval);
+        return;
+    }
+}
+
+
+/* Built-in cd command */
+void cd_command(struct command *obj, int retval, char line[]) {
+    int cd = chdir(obj->args[1]);
+    if (cd < 0) {
+        fprintf(stderr, "Error: cannot cd into directory\n");
+        fprintf(stderr, "+ completed '%s' [%d]\n", line, ++retval);
+        return;
+    }
+    fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
 }
 
 
@@ -191,6 +195,7 @@ void set_file(struct command *obj, char file[]) {
         ptr++;
     strcpy(obj->file, ptr);
 }
+
 
 /* Splits the input using the space character to mark the end of each argument
  * Stores output file in file array if > is encountered */
@@ -236,6 +241,7 @@ int parse_arg(struct command *obj, char str[]) {
     return 0;
 }
 
+
 /* Separates the input into their different commands after pipe is encountered
  * Calls parse_arg after to split the command further into its arguments */
 int parse_cmd(struct std_in *obj, char str[]) {
@@ -262,6 +268,7 @@ int parse_cmd(struct std_in *obj, char str[]) {
     return count;
 }
 
+
 int main(void) {
     char line[CMDLINE_MAX];
     struct alphabet lowercases[ALPHABET_MAX];
@@ -269,8 +276,6 @@ int main(void) {
     // Initialize set array to " "
     for (int i = 0; i < ALPHABET_MAX; i++)
         memset(lowercases[i].set, '\0', sizeof(char));
-
-   
 
     while (1) {
         int num_com = 0; // Number of commands separated by pipe
@@ -363,33 +368,33 @@ int main(void) {
 
         /* Built in command current directory */
         if (!strcmp(line, "pwd")) {
-            pwd_command(retval,line); 
-	    continue;
+            pwd_command(retval, line);
+            continue;
         }
 
         /* Built in command exit */
         if (!strcmp(line, "exit")) {
-            exit_command(retval,line);
+            exit_command(retval, line);
             break;
         }
 
         /* Built in command change directory */
         if (!strcmp(piped_commands.input, "cd")) {
-            cd_command(&command,retval,line);
+            cd_command(&command, retval, line);
             continue;
         }
 
         /* Builtin command set */
         if (!strcmp(piped_commands.input, "set")) {
-       	     	set_command(lowercases,&command,retval,line);
-            	continue;
-            }
-       
+            set_command(lowercases, &command, retval, line);
+            continue;
+        }
 
         /* Non-built in commands will be carried out by the exec function
          * The child process executes the command
          * The parent waits for the child to execute the process and displays its return status */
-        if (strcmp(piped_commands.input, "pwd") && strcmp(piped_commands.input, "cd") && strcmp(piped_commands.input, "set") && num_com == 0) {
+        if (strcmp(piped_commands.input, "pwd") && strcmp(piped_commands.input, "cd") &&
+            strcmp(piped_commands.input, "set") && num_com == 0) {
             int fd;
 
             if (err == 1) {
@@ -407,7 +412,8 @@ int main(void) {
                     continue;
                 }
                 /* If we cannot open the file */
-                if ((fd = open(command.file, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IRGRP | S_IWGRP | S_IWUSR)) == -1) {
+                if ((fd = open(command.file, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IRGRP | S_IWGRP | S_IWUSR)) ==
+                    -1) {
                     fprintf(stderr, "Error: cannot open output file\n");
                     continue;
                 }
