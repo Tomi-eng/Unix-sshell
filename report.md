@@ -5,11 +5,11 @@ Winter 2021.
 
 ## High-level design choices
 
-* Refactoring Parser Functionality
+* **Refactoring Parser Functionality**
 
 The most prominent design choice that stands out was the separation of the
 parser functionality into two main, separate functions **parse_cmd** and
-**parse_arg**. This was mainly done at the point where we started to implement
+**parse_arg**.  This was mainly done at the point where we started to implement
 functionality for pipelining, as in cases where we received a pipeline of
 commands, we not only needed to separate the command name from the arguments in
 each command, but also to separate each piped command from one another. As a
@@ -26,14 +26,14 @@ spaces if encountered and clean up the file name; therefore, we decided to
 create a helper function **set_file** for **parse_arg** that did the cleaning by
 getting rid of any whitespaces. This kept our parser function better readable.
 
-* Refactoring built-in commands
+* **Refactoring built-in commands**
 
 We refactored all built-in shell commands into their own dedicated functions
 (such as **exit_command**, **pwd_command**, etc), along with their error
 handling in order to keep the code clean and readable in main, along with the
 variable parsing function.
 
-* Set command
+* **Set command**
 
 For the set command, we decided to store the value of each variable in a simple
 array. We decided a static array was the best data structure for handling the
@@ -47,7 +47,7 @@ up, it seemed like a great tradeoff in comparison to dynamically creating a
 variable to hold the value each time, as the code gets a bit more complex by
 doing so.
 
-* Parsing Commands as Structs
+* **Parsing Commands as Structs**
 
 Commands were taken as structs in order to implement the parser functions as
 C++like methods that receive our command object as a parameter, which helped in
@@ -59,7 +59,7 @@ complex cases such as pipelining where it was necessary to keep track of
 multiple commands and their corresponding arguments (which we did so with
 **std_in** structs), thus making it a good design choice overall. 
 
-* Error Handling
+* **Error Handling**
 
 We took advantage of the fact that, if **execvp()** is successful, then the
 process swaps and doesn't run the next lines in the program, and because we did
@@ -69,7 +69,7 @@ This simplified handling this error as it may be more complex to do error
 checking first and ensuring the command exists first before trying to execute
 the command.
 
-* Limitations
+* **Limitations**
 
 We took advantage of the fact that, according to the project assignment, we
 would only be required up to pass cases for up to three pipes in regards to
