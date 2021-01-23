@@ -32,6 +32,7 @@ struct std_in {
 };
 
 
+/* Pipeline handler */
 void pipeline(struct command p[], int num_com, char *line) {
     // We're off by one when entering this function, therefore increment num_com first
     num_com++;
@@ -125,12 +126,14 @@ void pipeline(struct command p[], int num_com, char *line) {
 }
 
 
+/* Built-in exit command */
 void exit_command(int retval, char line[]) {
     fprintf(stderr, "Bye...\n");
     fprintf(stderr, "+ completed '%s' [%d]\n", line, retval);
 }
 
 
+/* Built-in pwd command */
 void pwd_command(int retval, char line[]) {
     char cwd[CWD_MAX];
     fprintf(stdout, "%s\n", getcwd(cwd, sizeof(cwd)));
@@ -138,6 +141,7 @@ void pwd_command(int retval, char line[]) {
 }
 
 
+/* Built-in set command */
 void set_command(struct alphabet *lowercases, struct command *obj, int retval, char line[]) {
     char arg[2];
     if (obj->args[1] == NULL) {
@@ -172,6 +176,7 @@ void set_command(struct alphabet *lowercases, struct command *obj, int retval, c
 }
 
 
+/* Built-in cd command */
 void cd_command(struct command *obj, int retval, char line[]) {
     int cd = chdir(obj->args[1]);
     if (cd < 0) {
